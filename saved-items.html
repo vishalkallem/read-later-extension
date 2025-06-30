@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Read Later - Saved Items</title>
+  <link rel="stylesheet" href="saved-items.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="header-content">
+        <h1>
+          <span class="gradient-text">Read Later</span>
+          <span class="item-count"></span>
+        </h1>
+        <div class="header-actions">
+          <button id="theme-toggle" class="btn btn-icon" title="Toggle Dark Mode">
+            <svg class="sun-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="5"></circle>
+              <line x1="12" y1="1" x2="12" y2="3"></line>
+              <line x1="12" y1="21" x2="12" y2="23"></line>
+              <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+              <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+              <line x1="1" y1="12" x2="3" y2="12"></line>
+              <line x1="21" y1="12" x2="23" y2="12"></line>
+              <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+              <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+            </svg>
+            <svg class="moon-icon hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+            </svg>
+          </button>
+          <button id="export-data" class="btn btn-secondary">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="7 10 12 15 17 10"></polyline>
+              <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg>
+            Export
+          </button>
+          <button id="import-data" class="btn btn-secondary">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="17 8 12 3 7 8"></polyline>
+              <line x1="12" y1="3" x2="12" y2="15"></line>
+            </svg>
+            Import
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <div class="toolbar">
+      <div class="search-box">
+        <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="11" cy="11" r="8"></circle>
+          <path d="M21 21l-4.35-4.35"></path>
+        </svg>
+        <input type="text" id="search-input" placeholder="Search saved items...">
+      </div>
+
+      <div class="filters">
+        <select id="filter-status">
+          <option value="all">All Items</option>
+          <option value="unread">Unread</option>
+          <option value="read">Read</option>
+        </select>
+
+        <select id="sort-by">
+          <option value="newest">Newest First</option>
+          <option value="oldest">Oldest First</option>
+          <option value="title">Title A-Z</option>
+          <option value="title-desc">Title Z-A</option>
+          <option value="tag">By Tag</option>
+        </select>
+
+        <select id="filter-tag" class="hidden">
+          <option value="all">All Tags</option>
+        </select>
+      </div>
+
+      <div class="view-controls">
+        <button id="view-grid" class="view-btn active" title="Grid View">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="3" width="7" height="7"></rect>
+            <rect x="14" y="3" width="7" height="7"></rect>
+            <rect x="14" y="14" width="7" height="7"></rect>
+            <rect x="3" y="14" width="7" height="7"></rect>
+          </svg>
+        </button>
+        <button id="view-list" class="view-btn" title="List View">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="8" y1="6" x2="21" y2="6"></line>
+            <line x1="8" y1="12" x2="21" y2="12"></line>
+            <line x1="8" y1="18" x2="21" y2="18"></line>
+            <line x1="3" y1="6" x2="3.01" y2="6"></line>
+            <line x1="3" y1="12" x2="3.01" y2="12"></line>
+            <line x1="3" y1="18" x2="3.01" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <div class="tag-cloud" id="tag-cloud">
+      <!-- Dynamic tag cloud will be inserted here -->
+    </div>
+
+    <div class="content">
+      <div id="items-container" class="items-grid">
+        <!-- Items will be dynamically inserted here -->
+      </div>
+
+      <div id="empty-state" class="empty-state hidden">
+        <div class="empty-animation">
+          <svg class="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+          </svg>
+        </div>
+        <h2>No saved items yet</h2>
+        <p>Start saving articles to read later using the extension or keyboard shortcuts</p>
+        <div class="empty-shortcuts">
+          <div class="shortcut-item">
+            <kbd>⌥ E</kbd> Save full article
+          </div>
+          <div class="shortcut-item">
+            <kbd>⌥ L</kbd> Save selection
+          </div>
+          <div class="shortcut-item">
+            <kbd>⌥ R</kbd> Open this page
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Item Modal -->
+  <div id="item-modal" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 id="modal-title">Item Title</h2>
+        <button class="modal-close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="modal-meta">
+          <span id="modal-author"></span>
+          <span id="modal-date"></span>
+          <a id="modal-url" href="#" target="_blank" class="btn btn-link">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+              <polyline points="15 3 21 3 21 9"></polyline>
+              <line x1="10" y1="14" x2="21" y2="3"></line>
+            </svg>
+            Visit Original
+          </a>
+        </div>
+        <div id="modal-highlights" class="modal-highlights"></div>
+        <div class="modal-notes">
+          <h3>Notes</h3>
+          <textarea id="modal-notes-input" placeholder="Add your notes here..." rows="4"></textarea>
+        </div>
+        <div class="modal-tags">
+          <h3>Tags</h3>
+          <div id="modal-tags-list"></div>
+          <input type="text" id="modal-tags-input" placeholder="Add tags (press Enter)">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="modal-save" class="btn btn-primary">Save Changes</button>
+        <button id="modal-delete" class="btn btn-danger">Delete Item</button>
+      </div>
+    </div>
+  </div>
+
+  <input type="file" id="import-file" accept=".json" style="display: none;">
+
+  <script src="saved-items.js"></script>
+</body>
+</html> 

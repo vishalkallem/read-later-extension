@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Read Later</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Read Later</h1>
+      <p class="subtitle">Save articles locally for reading later</p>
+    </header>
+
+    <div class="content">
+      <div class="current-page">
+        <h2>Current Page</h2>
+        <div class="page-info">
+          <div class="info-item">
+            <label>Title:</label>
+            <span id="page-title" class="value">Loading...</span>
+          </div>
+          <div class="info-item">
+            <label>Author:</label>
+            <span id="page-author" class="value">Unknown</span>
+          </div>
+          <div class="info-item">
+            <label>URL:</label>
+            <span id="page-url" class="value truncate">Loading...</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button id="save-selection" class="btn btn-primary" disabled>
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M9 11l3 3L22 4"></path>
+            <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"></path>
+          </svg>
+          Save Selected Text
+        </button>
+        
+        <button id="save-article" class="btn btn-secondary">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+            <line x1="16" y1="13" x2="8" y2="13"></line>
+            <line x1="16" y1="17" x2="8" y2="17"></line>
+            <polyline points="10 9 9 9 8 9"></polyline>
+          </svg>
+          Save Full Article
+        </button>
+
+        <button id="view-all" class="btn btn-tertiary">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M4 6h16M4 12h16M4 18h16"></path>
+          </svg>
+          View All Saved Items
+        </button>
+      </div>
+
+      <div class="shortcuts">
+        <h3>Keyboard Shortcuts</h3>
+        <div class="shortcut-item">
+          <kbd id="save-shortcut">Cmd+Shift+A</kbd>
+          <span>Save current page</span>
+        </div>
+        <div class="shortcut-item">
+          <kbd id="view-shortcut">Cmd+Shift+O</kbd>
+          <span>View saved items</span>
+        </div>
+        <button id="configure-shortcuts" class="btn btn-small">Configure</button>
+      </div>
+
+      <div class="stats">
+        <div class="stat-item">
+          <span class="stat-value" id="total-items">0</span>
+          <span class="stat-label">Saved Items</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-value" id="unread-items">0</span>
+          <span class="stat-label">Unread</span>
+        </div>
+      </div>
+
+      <div id="status" class="status hidden"></div>
+    </div>
+
+    <footer>
+      <p>Your data is stored locally and synced across devices</p>
+    </footer>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html> 

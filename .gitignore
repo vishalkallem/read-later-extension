@@ -1,0 +1,27 @@
+# Development files
+.DS_Store
+node_modules/
+*.log
+*.swp
+*.swo
+*~
+
+# Temporary files
+tmp/
+temp/
+
+# IDE files
+.vscode/
+.idea/
+*.sublime-*
+
+
+
+# Chrome extension package
+*.crx
+*.pem
+*.zip
+
+# Test files
+test-page.html
+test-extension.html 
