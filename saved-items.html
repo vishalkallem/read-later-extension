@@ -15,6 +15,12 @@
           <span class="item-count"></span>
         </h1>
         <div class="header-actions">
+          <div class="user-stats-display">
+            <span class="stats-item" data-analytics="totalArticles">0</span> saved • 
+            <span class="stats-item" data-analytics="readArticles">0</span> read • 
+            <span class="stats-item" data-analytics="readStreak">0</span> day streak
+            <button id="refresh-analytics" style="margin-left: 8px; padding: 2px 6px; font-size: 10px; border: 1px solid; border-radius: 3px; background: none; cursor: pointer;" title="Refresh Analytics">↻</button>
+          </div>
           <button id="theme-toggle" class="btn btn-icon" title="Toggle Dark Mode">
             <svg class="sun-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <circle cx="12" cy="12" r="5"></circle>
@@ -47,6 +53,13 @@
             </svg>
             Import
           </button>
+          <button id="import-kindle" class="btn btn-secondary">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+              <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+            </svg>
+            Import Kindle
+          </button>
         </div>
       </div>
     </header>
@@ -65,6 +78,11 @@
           <option value="all">All Items</option>
           <option value="unread">Unread</option>
           <option value="read">Read</option>
+          <option value="kindle">Kindle Books</option>
+        </select>
+
+        <select id="filter-domain">
+          <option value="all">All Domains</option>
         </select>
 
         <select id="sort-by">
@@ -72,6 +90,9 @@
           <option value="oldest">Oldest First</option>
           <option value="title">Title A-Z</option>
           <option value="title-desc">Title Z-A</option>
+          <option value="domain">By Domain</option>
+          <option value="read-status">Read Status</option>
+          <option value="kindle-author">Kindle by Author</option>
           <option value="tag">By Tag</option>
         </select>
 
@@ -122,13 +143,13 @@
         <p>Start saving articles to read later using the extension or keyboard shortcuts</p>
         <div class="empty-shortcuts">
           <div class="shortcut-item">
-            <kbd>⌥ E</kbd> Save full article
+            <kbd>Ctrl+Shift+A</kbd> Save full article
           </div>
           <div class="shortcut-item">
-            <kbd>⌥ L</kbd> Save selection
+            <kbd>Ctrl+Shift+S</kbd> Save selection
           </div>
           <div class="shortcut-item">
-            <kbd>⌥ R</kbd> Open this page
+            <kbd>Ctrl+Shift+O</kbd> Open this page
           </div>
         </div>
       </div>
@@ -175,6 +196,7 @@
   </div>
 
   <input type="file" id="import-file" accept=".json" style="display: none;">
+  <input type="file" id="import-kindle-file" accept=".txt,.csv" style="display: none;">
 
   <script src="saved-items.js"></script>
 </body>

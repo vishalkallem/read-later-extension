@@ -1,14 +1,40 @@
 // Content script to extract page data and handle text selection
 
-// Extract page metadata
-function extractPageMetadata() {
+// Wrap everything in an IIFE to avoid global scope pollution
+(function() {
+  'use strict';
+  
+  // Check if already injected
+  if (window.__readLaterContentScriptInjected) {
+    console.log('Read Later content script already injected, skipping...');
+    return;
+  }
+  window.__readLaterContentScriptInjected = true;
+  
+  console.log('Read Later content script loaded for:', window.location.href);
+
+  // Calculate reading time based on word count
+  function calculateReadingTime(text) {
+    if (!text) return 0;
+    
+    // Average reading speed: 225 words per minute
+    const wordsPerMinute = 225;
+    const words = text.trim().split(/\s+/).length;
+    const minutes = Math.ceil(words / wordsPerMinute);
+    
+    return minutes;
+  }
+
+  // Extract page metadata
+  function extractPageMetadata() {
   const metadata = {
     title: '',
     author: '',
     url: window.location.href,
     selectedText: '',
     fullContent: '',
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
+    readingTime: 0
   };
 
   // Get page title
@@ -66,7 +92,7 @@ function extractPageMetadata() {
     metadata.selectedText = selection.toString().trim();
   }
 
-  // Extract main content (for full article save)
+  // Extract main content using readability.js for better results
   // Special handling for Reddit
   if (window.location.hostname.includes('reddit.com')) {
     // Get post title
@@ -114,24 +140,62 @@ function extractPageMetadata() {
       }
     }
   }
-  // Generic content extraction
+  // Use readability.js for better content extraction
   else {
-    const contentSelectors = [
-      'article',
-      '[role="main"]',
-      'main',
-      '.post-content',
-      '.article-content',
-      '.entry-content',
-      '#content',
-      '.content'
-    ];
+    try {
+      // Check if readability is available
+      if (typeof Readability !== 'undefined') {
+        const documentClone = document.cloneNode(true);
+        const article = new Readability(documentClone).parse();
+        
+        if (article && article.textContent) {
+          metadata.fullContent = article.textContent.trim();
+          // Use readability title if it's better
+          if (article.title && article.title.length > metadata.title.length) {
+            metadata.title = article.title;
+          }
+        }
+      } else {
+        // Fallback to manual extraction
+        const contentSelectors = [
+          'article',
+          '[role="main"]',
+          'main',
+          '.post-content',
+          '.article-content',
+          '.entry-content',
+          '#content',
+          '.content'
+        ];
 
-    for (const selector of contentSelectors) {
-      const element = document.querySelector(selector);
-      if (element) {
-        metadata.fullContent = element.textContent?.trim() || '';
-        break;
+        for (const selector of contentSelectors) {
+          const element = document.querySelector(selector);
+          if (element) {
+            metadata.fullContent = element.textContent?.trim() || '';
+            break;
+          }
+        }
+      }
+    } catch (error) {
+      console.log('Readability extraction failed, using fallback:', error);
+      // Fallback to manual extraction
+      const contentSelectors = [
+        'article',
+        '[role="main"]',
+        'main',
+        '.post-content',
+        '.article-content',
+        '.entry-content',
+        '#content',
+        '.content'
+      ];
+
+      for (const selector of contentSelectors) {
+        const element = document.querySelector(selector);
+        if (element) {
+          metadata.fullContent = element.textContent?.trim() || '';
+          break;
+        }
       }
     }
   }
@@ -141,55 +205,103 @@ function extractPageMetadata() {
     metadata.fullContent = document.body.textContent?.trim() || '';
   }
 
+  // Calculate reading time based on content
+  const contentToMeasure = metadata.selectedText || metadata.fullContent;
+  metadata.readingTime = calculateReadingTime(contentToMeasure);
+
   return metadata;
 }
 
 // Check if extension context is valid
 function isExtensionContextValid() {
   try {
-    return chrome.runtime && chrome.runtime.id;
+    // Try to access chrome.runtime.id - will throw if context is invalid
+    return chrome.runtime && !!chrome.runtime.id;
   } catch (e) {
+    return false;
+  }
+}
+
+// Clean up function to stop sending messages when context is invalid
+let contextValid = true;
+function checkContextPeriodically() {
+  if (!isExtensionContextValid()) {
+    contextValid = false;
+    // Remove event listeners to prevent errors
+    document.removeEventListener('mouseup', handleMouseUp);
+  }
+}
+
+// Check context every 5 seconds
+setInterval(checkContextPeriodically, 5000);
+
+// Message handler function
+function handleMessage(request, sender, sendResponse) {
+  // Double-check context is still valid
+  if (!isExtensionContextValid() || !contextValid) {
+    console.log('Extension context invalid, ignoring message');
+    return false;
+  }
+  
+  try {
+    console.log('Content script received message:', request.action);
+    
+    if (request.action === 'extractData') {
+      const data = extractPageMetadata();
+      console.log('Extracted data:', { title: data.title, author: data.author, readingTime: data.readingTime });
+      sendResponse(data);
+    } else if (request.action === 'getSelectedText') {
+      const selection = window.getSelection();
+      const selectedText = selection ? selection.toString().trim() : '';
+      console.log('Selected text length:', selectedText.length);
+      sendResponse({ selectedText });
+    }
+    return true; // Keep the message channel open for async response
+  } catch (error) {
+    console.error('Error handling message:', error);
+    sendResponse({ error: error.message });
     return false;
   }
 }
 
 // Listen for messages from the background script
 if (isExtensionContextValid()) {
-  chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-    if (request.action === 'extractData') {
-      const data = extractPageMetadata();
-      sendResponse(data);
-    } else if (request.action === 'getSelectedText') {
-      const selection = window.getSelection();
-      sendResponse({ selectedText: selection ? selection.toString().trim() : '' });
-    }
-    return true; // Keep the message channel open for async response
-  });
+  try {
+    chrome.runtime.onMessage.addListener(handleMessage);
+  } catch (error) {
+    // Failed to add listener - extension context likely invalid
+  }
 }
 
-// Send selected text to background script when user selects text
-document.addEventListener('mouseup', () => {
+// Handle mouseup events for text selection
+function handleMouseUp() {
   // Check if extension context is still valid before sending message
-  if (!isExtensionContextValid()) {
-    console.log('Extension context invalidated, skipping message');
-    return;
+  if (!isExtensionContextValid() || !contextValid) {
+    return; // Silently skip if context is invalid
   }
   
   const selection = window.getSelection();
   if (selection && selection.toString().trim()) {
     try {
+      // Use callback instead of promise to handle errors
       chrome.runtime.sendMessage({
         action: 'textSelected',
         text: selection.toString().trim()
-      }).catch(error => {
-        // Silently fail if extension context is invalidated
-        if (error.message && error.message.includes('Extension context invalidated')) {
-          console.log('Extension reloaded, message not sent');
+      }, response => {
+        // Check for errors in callback
+        if (chrome.runtime.lastError) {
+          // Silently ignore - extension was likely reloaded
+          return;
         }
       });
     } catch (error) {
       // Silently fail if extension context is invalidated
-      console.log('Extension context error:', error.message);
+      // This happens when the extension is reloaded
     }
   }
-}); 
+}
+
+  // Send selected text to background script when user selects text
+  document.addEventListener('mouseup', handleMouseUp);
+  
+})(); // End of IIFE 

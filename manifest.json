@@ -2,67 +2,51 @@
   "manifest_version": 3,
   "name": "Read Later",
   "version": "1.0.0",
-  "description": "Save articles and highlighted text for reading later with tags and notes",
+  "description": "Save articles and highlights for later reading",
   "permissions": [
-    "activeTab",
-    "contextMenus",
     "storage",
-    "notifications",
-    "tabs",
+    "activeTab",
     "scripting",
-    "windows",
-    "identity"
+    "contextMenus",
+    "notifications"
   ],
-  "commands": {
-    "save-full-article": {
-      "suggested_key": {
-        "default": "Alt+Shift+A",
-        "mac": "Command+Shift+A"
-      },
-      "description": "Save full article to read later"
-    },
-    "save-selection": {
-      "suggested_key": {
-        "default": "Alt+Shift+S",
-        "mac": "Command+Shift+S"
-      },
-      "description": "Save selection to read later"
-    },
-    "open-saved-items": {
-      "suggested_key": {
-        "default": "Alt+Shift+O",
-        "mac": "Command+Shift+O"
-      },
-      "description": "Open Read Later page"
-    }
-  },
   "background": {
     "service_worker": "background.js"
   },
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
-      "js": ["content.js"],
-      "run_at": "document_idle",
-      "all_frames": false
+      "js": ["DOMPurify.js", "readability.js", "content.js"],
+      "css": ["saved-items.css"]
     }
-  ],
-  "host_permissions": [
-    "https://*.reddit.com/*",
-    "https://*.x.com/*", 
-    "https://*.twitter.com/*"
   ],
   "action": {
     "default_popup": "popup.html",
-    "default_icon": {
-      "16": "icons/icon-16.png",
-      "48": "icons/icon-48.png",
-      "128": "icons/icon-128.png"
-    }
+    "default_title": "Read Later"
   },
   "icons": {
     "16": "icons/icon-16.png",
     "48": "icons/icon-48.png",
     "128": "icons/icon-128.png"
+  },
+  "commands": {
+    "save-article": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+A"
+      },
+      "description": "Save current article"
+    },
+    "save-selection": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+S"
+      },
+      "description": "Save selected text"
+    },
+    "open-saved": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+O"
+      },
+      "description": "Open saved items"
+    }
   }
 } 

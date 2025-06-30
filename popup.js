@@ -34,27 +34,38 @@ document.addEventListener('DOMContentLoaded', async () => {
     try {
       await chrome.scripting.executeScript({
         target: { tabId: currentTab.id },
-        files: ['content.js']
+        files: ['DOMPurify.js', 'readability.js', 'content.js']
       });
+      console.log('Content scripts injected successfully');
     } catch (injectionError) {
       // Content script might already be injected, continue anyway
       console.log('Content script injection attempted:', injectionError.message);
     }
 
+    // Wait a moment for scripts to initialize
+    await new Promise(resolve => setTimeout(resolve, 200));
+
     // Now try to get the page data
+    // Verify tab still exists
+    if (!currentTab || !currentTab.id) {
+      throw new Error('Tab no longer exists');
+    }
+    
+    console.log('Requesting page data from content script...');
     const response = await chrome.tabs.sendMessage(currentTab.id, { action: 'extractData' });
+    console.log('Received page data:', response);
     updatePageInfo(response);
   } catch (error) {
     console.error('Error getting page data:', error);
     // Use basic tab info as fallback
     updatePageInfo({
-      title: currentTab.title || 'Unable to extract page data',
+      title: currentTab?.title || 'Unable to extract page data',
       author: '',
-      url: currentTab.url
+      url: currentTab?.url || ''
     });
     
     // Show a more helpful message
-    if (error.message && error.message.includes('Receiving end does not exist')) {
+    if (error.message && (error.message.includes('Receiving end does not exist') || error.message.includes('No tab with id'))) {
       showStatus('Please refresh the page and try again', 'info');
     }
   }
@@ -154,22 +165,26 @@ async function saveItem(selectedTextOverride) {
 
 // Load statistics
 async function loadStats() {
-  const savedItems = await chrome.runtime.sendMessage({ action: 'getSavedItems' });
-  const totalItems = savedItems.length;
-  const unreadItems = savedItems.filter(item => !item.read).length;
-  
-  document.getElementById('total-items').textContent = totalItems;
-  document.getElementById('unread-items').textContent = unreadItems;
+  try {
+    const savedItems = await chrome.runtime.sendMessage({ action: 'getSavedItems' });
+    const totalItems = savedItems.length;
+    const unreadItems = savedItems.filter(item => !item.read).length;
+    
+    document.getElementById('total-items').textContent = totalItems;
+    document.getElementById('unread-items').textContent = unreadItems;
+  } catch (error) {
+    console.error('Error loading stats:', error);
+    // Set default values on error
+    document.getElementById('total-items').textContent = '0';
+    document.getElementById('unread-items').textContent = '0';
+  }
 }
 
 // Update shortcut display based on platform
 function updateShortcutDisplay() {
-  const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
-  
-  if (!isMac) {
-    document.getElementById('save-shortcut').textContent = 'Ctrl+Shift+E';
-    document.getElementById('view-shortcut').textContent = 'Ctrl+Shift+L';
-  }
+  // Using Ctrl for all platforms now
+  document.getElementById('save-shortcut').textContent = 'Ctrl+Shift+A';
+  document.getElementById('view-shortcut').textContent = 'Ctrl+Shift+O';
 }
 
 
@@ -191,7 +206,7 @@ function showStatus(message, type = 'info') {
 
 // Listen for text selection updates from content script
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  if (request.action === 'textSelected' && sender.tab.id === currentTab.id) {
+  if (request.action === 'textSelected' && sender?.tab?.id === currentTab?.id) {
     selectedText = request.text;
     document.getElementById('save-selection').disabled = false;
     document.getElementById('save-selection').innerHTML = `

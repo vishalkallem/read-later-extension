@@ -24,4 +24,5 @@ temp/
 
 # Test files
 test-page.html
-test-extension.html 
+test-extension.html
+keyboard-test.html 

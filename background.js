@@ -35,12 +35,23 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
 chrome.commands.onCommand.addListener(async (command) => {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   
-  if (command === 'save-full-article') {
+  if (command === 'save-article') {
     // Save full article
     saveItem(tab, null);
   } else if (command === 'save-selection') {
     // Save selected text
     try {
+      // Check if tab exists and is valid
+      if (!tab || !tab.id) {
+        chrome.notifications.create({
+          type: 'basic',
+          iconUrl: 'icons/icon-48.png',
+          title: 'Error',
+          message: 'No active tab found. Please try again.'
+        });
+        return;
+      }
+      
       const response = await chrome.tabs.sendMessage(tab.id, { action: 'getSelectedText' });
       if (response.selectedText) {
         saveItem(tab, response.selectedText);
@@ -58,7 +69,7 @@ chrome.commands.onCommand.addListener(async (command) => {
       try {
         await chrome.scripting.executeScript({
           target: { tabId: tab.id },
-          files: ['content.js']
+          files: ['DOMPurify.js', 'readability.js', 'content.js']
         });
         // Try again after injection
         const response = await chrome.tabs.sendMessage(tab.id, { action: 'getSelectedText' });
@@ -73,8 +84,7 @@ chrome.commands.onCommand.addListener(async (command) => {
           });
         }
       } catch (injectionError) {
-        console.error('Failed to inject content script:', injectionError);
-        chrome.notifications.create({
+          chrome.notifications.create({
           type: 'basic',
           iconUrl: 'icons/icon-48.png',
           title: 'Error',
@@ -82,7 +92,7 @@ chrome.commands.onCommand.addListener(async (command) => {
         });
       }
     }
-  } else if (command === 'open-saved-items') {
+  } else if (command === 'open-saved') {
     // Open the saved items page
     chrome.tabs.create({ url: chrome.runtime.getURL('saved-items.html') });
   }
@@ -111,6 +121,17 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 // Save item to local storage
 async function saveItem(tab, selectedText, isSpecialPage = false) {
   try {
+    // Validate tab
+    if (!tab || !tab.id) {
+      chrome.notifications.create({
+        type: 'basic',
+        iconUrl: 'icons/icon-48.png',
+        title: 'Error',
+        message: 'No valid tab found. Please try again.'
+      });
+      return;
+    }
+    
     let response;
     
     // Handle special pages (chrome://, extension://, etc.)
@@ -120,31 +141,38 @@ async function saveItem(tab, selectedText, isSpecialPage = false) {
         author: 'Browser',
         url: tab.url,
         selectedText: selectedText || '',
-        fullContent: selectedText || 'Content cannot be extracted from this type of page'
+        fullContent: selectedText || 'Content cannot be extracted from this type of page',
+        readingTime: 0
       };
     } else {
       try {
         // Try to get page data from content script
         response = await chrome.tabs.sendMessage(tab.id, { action: 'extractData' });
       } catch (error) {
+        console.log('Content script not loaded, injecting...', error.message);
+        
         // If content script isn't loaded, inject it first
-        console.log('Content script not loaded, injecting...');
         try {
           await chrome.scripting.executeScript({
             target: { tabId: tab.id },
-            files: ['content.js']
+            files: ['DOMPurify.js', 'readability.js', 'content.js']
           });
+          
+          // Wait a moment for the script to initialize
+          await new Promise(resolve => setTimeout(resolve, 100));
+          
           // Try again after injection
           response = await chrome.tabs.sendMessage(tab.id, { action: 'extractData' });
         } catch (injectionError) {
-          console.error('Failed to inject content script:', injectionError);
+          console.log('Content script injection failed, using fallback data:', injectionError.message);
           // Fall back to basic data
           response = {
             title: tab.title || 'Untitled',
             author: 'Unknown',
             url: tab.url,
             selectedText: selectedText || '',
-            fullContent: ''
+            fullContent: '',
+            readingTime: 0
           };
         }
       }
@@ -157,35 +185,45 @@ async function saveItem(tab, selectedText, isSpecialPage = false) {
     
     // Create item object
     const item = {
-      id: Date.now().toString(), // Simple ID generation
-      title: response.title,
+      id: Date.now().toString() + '_' + Math.random().toString(36).substr(2, 9), // More unique ID
+      title: response.title || 'Untitled',
       author: response.author || 'Unknown',
       url: response.url,
       highlights: response.selectedText || '',
       savedAt: new Date().toISOString(),
       tags: [],
       notes: '',
-      read: false
+      read: false,
+      readingTime: response.readingTime || 0
     };
     
     // Get existing items
     const { savedItems } = await chrome.storage.local.get(['savedItems']);
     const items = savedItems || [];
     
+    // Check for duplicates based on URL
+    const isDuplicate = items.some(existingItem => existingItem.url === item.url);
+    if (isDuplicate) {
+      chrome.notifications.create({
+        type: 'basic',
+        iconUrl: 'icons/icon-48.png',
+        title: 'Already Saved',
+        message: `"${item.title}" has already been saved!`,
+        requireInteraction: false
+      });
+      return;
+    }
+    
     // Add new item to the beginning
     items.unshift(item);
     
-    // Save to storage (both local and sync)
+    // Save to storage
     await chrome.storage.local.set({ savedItems: items });
     
-    // Try to sync (may fail due to quota limits)
-    try {
-      await chrome.storage.sync.set({ savedItems: items });
-    } catch (syncError) {
-      console.log('Sync storage failed, using local only:', syncError);
-    }
-    
-    // Note: Firebase sync happens from the saved-items page when user is signed in
+    // Update user analytics (don't await to avoid blocking)
+    updateUserAnalytics('articleSaved', item).catch(error => {
+      console.error('Analytics update failed:', error);
+    });
     
     // Show success notification with more details
     const notificationMessage = response.selectedText 
@@ -204,17 +242,23 @@ async function saveItem(tab, selectedText, isSpecialPage = false) {
     });
     
     // Update badge
-    chrome.action.setBadgeText({ text: '✓', tabId: tab.id });
-    chrome.action.setBadgeBackgroundColor({ color: '#4CAF50', tabId: tab.id });
-    
-    // Clear badge after 3 seconds
-    setTimeout(() => {
-      chrome.action.setBadgeText({ text: '', tabId: tab.id });
-    }, 3000);
+    if (tab && tab.id) {
+      chrome.action.setBadgeText({ text: '✓', tabId: tab.id });
+      chrome.action.setBadgeBackgroundColor({ color: '#4CAF50', tabId: tab.id });
+      
+      // Clear badge after 3 seconds
+      setTimeout(() => {
+        // Check if tab still exists before clearing badge
+        chrome.tabs.get(tab.id, (existingTab) => {
+          if (!chrome.runtime.lastError && existingTab) {
+            chrome.action.setBadgeText({ text: '', tabId: tab.id });
+          }
+        });
+      }, 3000);
+    }
     
   } catch (error) {
-    console.error('Error saving item:', error);
-    
+    console.error('Save item error:', error);
     // Show error notification
     chrome.notifications.create({
       type: 'basic',
@@ -224,8 +268,10 @@ async function saveItem(tab, selectedText, isSpecialPage = false) {
     });
     
     // Update badge to show error
-    chrome.action.setBadgeText({ text: '!', tabId: tab.id });
-    chrome.action.setBadgeBackgroundColor({ color: '#F44336', tabId: tab.id });
+    if (tab && tab.id) {
+      chrome.action.setBadgeText({ text: '!', tabId: tab.id });
+      chrome.action.setBadgeBackgroundColor({ color: '#F44336', tabId: tab.id });
+    }
   }
 }
 
@@ -237,13 +283,6 @@ async function deleteSavedItem(id) {
   const filteredItems = items.filter(item => item.id !== id);
   
   await chrome.storage.local.set({ savedItems: filteredItems });
-  
-  // Try to sync
-  try {
-    await chrome.storage.sync.set({ savedItems: filteredItems });
-  } catch (syncError) {
-    console.log('Sync storage failed:', syncError);
-  }
 }
 
 // Update saved item
@@ -256,34 +295,17 @@ async function updateSavedItem(id, updates) {
     items[itemIndex] = { ...items[itemIndex], ...updates };
     
     await chrome.storage.local.set({ savedItems: items });
-    
-    // Try to sync
-    try {
-      await chrome.storage.sync.set({ savedItems: items });
-    } catch (syncError) {
-      console.log('Sync storage failed:', syncError);
-    }
   }
 }
 
-// Sync data on startup
+// Initialize on startup
 chrome.runtime.onStartup.addListener(async () => {
-  try {
-    // Try to get synced data
-    const syncData = await chrome.storage.sync.get(['savedItems']);
-    const localData = await chrome.storage.local.get(['savedItems']);
-    
-    // If sync has data and it's newer, use it
-    if (syncData.savedItems && syncData.savedItems.length > 0) {
-      // Simple merge strategy: use sync data if available
-      await chrome.storage.local.set({ savedItems: syncData.savedItems });
-    }
-  } catch (error) {
-    console.log('Error syncing data on startup:', error);
+  // Ensure storage is initialized
+  const { savedItems } = await chrome.storage.local.get(['savedItems']);
+  if (!savedItems) {
+    chrome.storage.local.set({ savedItems: [] });
   }
 });
-
-
 
 // Handle notification button clicks
 chrome.notifications.onButtonClicked.addListener((notificationId, buttonIndex) => {
@@ -291,4 +313,78 @@ chrome.notifications.onButtonClicked.addListener((notificationId, buttonIndex) =
     // Open saved items page
     chrome.tabs.create({ url: chrome.runtime.getURL('saved-items.html') });
   }
-}); 
+});
+
+// Update user analytics
+async function updateUserAnalytics(action, item) {
+  try {
+    // Get current user stats
+    const userId = await getUserId();
+    const result = await chrome.storage.local.get([`userStats_${userId}`]);
+    let stats = result[`userStats_${userId}`] || {
+      totalArticles: 0,
+      readArticles: 0,
+      readStreak: 0,
+      longestStreak: 0,
+      totalReadingTime: 0,
+      lastReadDate: null,
+      achievements: []
+    };
+    
+    if (action === 'articleSaved') {
+      stats.totalArticles++;
+      console.log('Updated total articles:', stats.totalArticles);
+    } else if (action === 'articleRead') {
+      if (!item.read) {
+        stats.readArticles++;
+        
+        // Update reading time
+        if (item.readingTime) {
+          stats.totalReadingTime += item.readingTime;
+        }
+        
+        // Update read streak
+        const today = new Date().toDateString();
+        const lastRead = stats.lastReadDate ? new Date(stats.lastReadDate).toDateString() : null;
+        
+        if (lastRead === today) {
+          // Already read today, no streak change
+        } else if (lastRead === new Date(Date.now() - 24 * 60 * 60 * 1000).toDateString()) {
+          // Read yesterday, increment streak
+          stats.readStreak++;
+        } else {
+          // Gap in reading, reset streak to 1
+          stats.readStreak = 1;
+        }
+        
+        stats.lastReadDate = new Date().toISOString();
+        
+        // Update longest streak
+        if (stats.readStreak > stats.longestStreak) {
+          stats.longestStreak = stats.readStreak;
+        }
+        
+        console.log('Updated read articles:', stats.readArticles, 'streak:', stats.readStreak);
+      }
+    }
+    
+    // Save updated stats
+    await chrome.storage.local.set({ [`userStats_${userId}`]: stats });
+    console.log('User analytics updated successfully');
+    
+  } catch (error) {
+    console.error('Error updating user analytics:', error);
+    // Don't throw - analytics failure shouldn't break saving
+  }
+}
+
+// Get or create user ID
+async function getUserId() {
+  const result = await chrome.storage.local.get(['readLaterUserId']);
+  let userId = result.readLaterUserId;
+  if (!userId) {
+    userId = 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+    await chrome.storage.local.set({ readLaterUserId: userId });
+  }
+  return userId;
+}
